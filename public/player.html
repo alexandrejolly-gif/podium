@@ -207,6 +207,7 @@
         <!-- Drumroll phase -->
         <div id="onlineRevealDrumroll" class="hidden center">
           <p class="top-counter" id="onlineRevealCounter"></p>
+          <p class="text-muted text-center" id="onlineRevealTheme" style="font-size:0.85rem;margin-bottom:0.75rem;font-style:italic"></p>
           <ul class="top-items" id="onlineRevealItems"></ul>
           <div class="drumroll">
             <div class="drumroll-dot"></div>
@@ -218,6 +219,7 @@
         <!-- Revealed owner + votes + personal result -->
         <div id="onlineRevealOwner" class="hidden">
           <p class="top-counter text-center" id="onlineRevealCounter2"></p>
+          <p class="text-muted text-center" id="onlineRevealTheme2" style="font-size:0.85rem;margin-bottom:0.75rem;font-style:italic"></p>
           <ul class="top-items" id="onlineRevealItems2"></ul>
           <div class="reveal-owner center" id="onlineRevealOwnerInfo"></div>
           <div class="reveal-votes mt-2" id="onlineRevealVotes" style="justify-content:center"></div>
@@ -751,13 +753,16 @@
       el.style.animation = 'pop .4s cubic-bezier(.34,1.56,.64,1)';
 
       let html = '';
+      if (p.theme) {
+        html += `<p class="text-muted" style="font-size:0.8rem;font-style:italic;margin-bottom:0.5rem">${escapeHtml(p.theme)}</p>`;
+      }
       if (p.isOwnTop) {
-        html = `
+        html += `
           <p style="font-size:1.1rem;font-weight:700;margin-bottom:0.5rem">C'etait ton top !</p>
           ${p.pointsEarned > 0 ? `<p class="text-teal" style="font-size:1.3rem;font-weight:700">+${p.pointsEarned} pts</p>` : '<p class="text-muted">+0 pt</p>'}
         `;
       } else {
-        html = `
+        html += `
           <p style="font-size:0.9rem;margin-bottom:0.5rem">C'etait le top de</p>
           <div style="display:flex;align-items:center;justify-content:center;gap:0.5rem;margin-bottom:0.5rem">
             ${avatarSVG(p.ownerAvatar, 36)}
@@ -819,6 +824,7 @@
       const drumEl = document.getElementById('onlineRevealDrumroll');
       drumEl.classList.remove('hidden');
       document.getElementById('onlineRevealCounter').textContent = `Top ${p.topIndex + 1} / ${p.totalTops}`;
+      document.getElementById('onlineRevealTheme').textContent = p.theme || '';
       renderTopItems('onlineRevealItems', p.items);
       playDrumroll();
 
@@ -828,6 +834,7 @@
         const ownerEl = document.getElementById('onlineRevealOwner');
         ownerEl.classList.remove('hidden');
         document.getElementById('onlineRevealCounter2').textContent = `Top ${p.topIndex + 1} / ${p.totalTops}`;
+        document.getElementById('onlineRevealTheme2').textContent = p.theme || '';
         renderTopItems('onlineRevealItems2', p.items);
 
         document.getElementById('onlineRevealOwnerInfo').innerHTML = `

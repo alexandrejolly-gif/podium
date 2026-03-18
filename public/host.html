@@ -91,6 +91,7 @@
 
       <div id="revealAnon" class="hidden">
         <p class="top-counter" id="revealCounter"></p>
+        <p class="text-muted text-center" id="revealTheme" style="font-size:0.9rem;margin-bottom:0.75rem;font-style:italic"></p>
         <ul class="top-items" id="revealItems"></ul>
         <div class="drumroll" id="revealDrumroll">
           <div class="drumroll-dot"></div>
@@ -101,6 +102,7 @@
 
       <div id="revealOwner" class="hidden">
         <p class="top-counter" id="revealCounter2"></p>
+        <p class="text-muted text-center" id="revealTheme2" style="font-size:0.9rem;margin-bottom:0.75rem;font-style:italic"></p>
         <ul class="top-items" id="revealItems2"></ul>
         <div class="reveal-owner" id="revealOwnerInfo"></div>
         <div class="reveal-votes mt-2" id="revealVotes"></div>
@@ -398,6 +400,7 @@
       const el = document.getElementById('revealAnon');
       el.classList.remove('hidden');
       document.getElementById('revealCounter').textContent = `Top ${p.topIndex + 1} / ${p.totalTops}`;
+      document.getElementById('revealTheme').textContent = p.theme || '';
       renderTopItems('revealItems', p.items);
       document.getElementById('revealDrumroll').classList.remove('hidden');
       playDrumroll();
@@ -408,6 +411,7 @@
       const el = document.getElementById('revealOwner');
       el.classList.remove('hidden');
       document.getElementById('revealCounter2').textContent = `Top ${p.topIndex + 1} / ${p.totalTops}`;
+      document.getElementById('revealTheme2').textContent = p.theme || '';
       renderTopItems('revealItems2', p.items);
 
       document.getElementById('revealOwnerInfo').innerHTML = `

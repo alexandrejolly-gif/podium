@@ -688,6 +688,7 @@ function handleNextReveal(room) {
       send(player.ws, 'reveal_top', {
         topIndex: room.revealIndex,
         totalTops: room.guessingOrder.length,
+        theme: room.currentTheme,
         ownerId: entry.ownerId,
         ownerName: owner?.name || '?',
         ownerAvatar: owner?.avatar ?? 0,
@@ -705,6 +706,7 @@ function handleNextReveal(room) {
     sendToHost(room, 'reveal_top', {
       topIndex: room.revealIndex,
       totalTops: room.guessingOrder.length,
+      theme: room.currentTheme,
       ownerId: entry.ownerId,
       ownerName: owner?.name || '?',
       ownerAvatar: owner?.avatar ?? 0,
@@ -726,6 +728,7 @@ function handleNextReveal(room) {
         const isOwner = id === entry.ownerId;
         send(player.ws, 'reveal_player_result', {
           topIndex: revealIdx,
+          theme: room.currentTheme,
           ownerId: entry.ownerId,
           ownerName: owner?.name || '?',
           ownerAvatar: owner?.avatar ?? 0,
