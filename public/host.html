@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Podium — Ecran hote</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    .mute-btn {
+      position: fixed; top: 1rem; right: 1rem; z-index: 100;
+      width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid var(--border);
+      background: var(--surface); cursor: pointer; display: flex; align-items: center;
+      justify-content: center; font-size: 1.2rem; transition: opacity 0.15s;
+    }
+    .mute-btn:hover { opacity: 0.7; }
+    .mute-btn:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+  </style>
+</head>
+<body class="host-body">
+
+  <!-- Mute button (amélioration 6) -->
+  <button class="mute-btn" id="muteBtn" onclick="toggleMute()" aria-label="Couper/activer le son" title="Son">
+    <span id="muteIcon">&#128264;</span>
+  </button>
+
+  <div class="host-container">
+
+    <!-- LOBBY -->
+    <div id="phase-lobby" class="phase active center" style="flex:1;justify-content:center">
+      <div class="logo" style="font-size:2rem;margin-bottom:1.5rem">Podium</div>
+      <div class="room-code" id="lobbyCode" aria-label="Code de la salle"></div>
+      <p class="room-url" id="lobbyUrl"></p>
+      <div class="qr-wrap mt-2" id="qrCode" role="img" aria-label="QR code pour rejoindre"></div>
+      <div class="spacer"></div>
+      <p class="host-phase-label">Joueurs connectes</p>
+      <div class="player-list" id="lobbyPlayers" aria-live="polite"></div>
+      <div class="spacer"></div>
+      <div>
+        <p class="text-muted mb-2">Nombre de rounds</p>
+        <div class="round-selector" id="roundSelector" role="group" aria-label="Nombre de rounds">
+          <button class="round-option" data-r="3" aria-label="3 rounds">3</button>
+          <button class="round-option selected" data-r="5" aria-label="5 rounds">5</button>
+          <button class="round-option" data-r="7" aria-label="7 rounds">7</button>
+        </div>
+      </div>
+      <div class="spacer"></div>
+      <button id="startBtn" class="btn btn-primary btn-large" disabled onclick="startGame()" aria-label="Demarrer la partie">
+        Demarrer
+      </button>
+      <p id="startHint" class="text-muted mt-1">3 joueurs minimum</p>
+    </div>
+
+    <!-- FILLING -->
+    <div id="phase-filling" class="phase center" style="flex:1;justify-content:center">
+      <p class="host-phase-label">Round <span id="fillRound">1</span>/<span id="fillTotal">5</span></p>
+      <div class="spacer-sm"></div>
+      <p class="theme-text" id="fillTheme"></p>
+      <div class="timer-bar-wrap mt-3">
+        <div class="timer-bar" id="fillTimerBar" style="width:100%" role="progressbar"></div>
+      </div>
+      <p class="timer-text" id="fillTimer" aria-live="polite">60</p>
+      <div class="spacer"></div>
+      <p class="host-phase-label">Joueurs</p>
+      <div class="player-list" id="fillPlayers" aria-live="polite"></div>
+      <p class="progress-text mt-1" id="fillProgress">0 / 0 prets</p>
+    </div>
+
+    <!-- GUESSING -->
+    <div id="phase-guessing" class="phase center" style="flex:1;justify-content:center">
+      <p class="host-phase-label">Round <span id="guessRound">1</span>/<span id="guessRoundTotal">5</span> &mdash; Devinez !</p>
+      <p class="text-muted mt-1">Regardez vos telephones</p>
+      <div class="spacer"></div>
+      <p class="top-counter" id="guessCounter">Top 1 / ?</p>
+      <ul class="top-items" id="guessItems" aria-label="Top anonyme"></ul>
+      <div class="timer-bar-wrap">
+        <div class="timer-bar" id="guessTimerBar" style="width:100%" role="progressbar"></div>
+      </div>
+      <p class="timer-text" id="guessTimer">30</p>
+      <p class="progress-text mt-1" id="guessProgress" aria-live="polite">0 / 0 votes</p>
+    </div>
+
+    <!-- REVEALING -->
+    <div id="phase-revealing" class="phase center" style="flex:1;justify-content:center">
+      <p class="host-phase-label" id="revealLabel">Revelation</p>
+
+      <div id="revealWaiting" class="hidden center">
+        <p class="text-muted">Pret pour la revelation ?</p>
+        <button class="btn btn-primary btn-large mt-2" onclick="sendNextReveal()" aria-label="Reveler le prochain top">Reveler</button>
+      </div>
+
+      <div id="revealAnon" class="hidden">
+        <p class="top-counter" id="revealCounter"></p>
+        <ul class="top-items" id="revealItems"></ul>
+        <div class="drumroll" id="revealDrumroll">
+          <div class="drumroll-dot"></div>
+          <div class="drumroll-dot"></div>
+          <div class="drumroll-dot"></div>
+        </div>
+      </div>
+
+      <div id="revealOwner" class="hidden">
+        <p class="top-counter" id="revealCounter2"></p>
+        <ul class="top-items" id="revealItems2"></ul>
+        <div class="reveal-owner" id="revealOwnerInfo"></div>
+        <div class="reveal-votes mt-2" id="revealVotes"></div>
+        <div class="spacer"></div>
+        <button class="btn btn-primary btn-large" onclick="sendNextReveal()">Suivant</button>
+      </div>
+    </div>
+
+    <!-- SCORES -->
+    <div id="phase-scores" class="phase center" style="flex:1;justify-content:center">
+      <p class="host-phase-label" id="scoresLabel">Scores</p>
+
+      <!-- Round scores -->
+      <div id="roundScores">
+        <div class="podium" id="podium"></div>
+        <div class="card mt-2" style="max-width:500px;width:100%">
+          <div id="scoreRows"></div>
+        </div>
+        <div class="spacer"></div>
+        <button id="nextRoundBtn" class="btn btn-primary btn-large" onclick="sendNextRound()">Round suivant</button>
+      </div>
+
+      <!-- Final scores -->
+      <div id="finalScores" class="hidden">
+        <div class="podium" id="finalPodium"></div>
+        <div class="badges" id="badgesWrap" aria-label="Badges"></div>
+        <div class="card mt-2" style="max-width:500px;width:100%">
+          <div id="finalScoreRows"></div>
+        </div>
+        <div class="spacer"></div>
+        <button class="btn btn-primary btn-large" onclick="sendPlayAgain()">Rejouer</button>
+      </div>
+    </div>
+
+    <!-- SUSPENDED -->
+    <div id="phase-suspended" class="phase center" style="flex:1;justify-content:center">
+      <div class="logo" style="font-size:2rem;margin-bottom:1rem">Podium</div>
+      <p style="font-size:1.2rem;font-weight:600">Partie suspendue</p>
+      <p class="text-muted mt-1">Pas assez de joueurs pour continuer.</p>
+      <div class="player-list mt-2" id="suspendedPlayers"></div>
+    </div>
+
+  </div>
+
+  <script src="/shared.js"></script>
+  <script>
+    // ── State ────────────────────────────────────────────────────────
+    const params = new URLSearchParams(location.search);
+    const ROOM_CODE = params.get('code');
+    if (!ROOM_CODE) location.href = '/';
+
+    let ws;
+    let players = [];
+    let rounds = 5;
+    let fillTimeTotal = 60;
+    let guessTimeTotal = 30;
+    let currentRevealData = null;
+    let isMuted = false;
+    let previousPlayerCount = 0;
+
+    // ── WebSocket ────────────────────────────────────────────────────
+    function connect() {
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      ws = new WebSocket(`${proto}://${location.host}`);
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ type: 'join_as_host', payload: { code: ROOM_CODE } }));
+      };
+      ws.onmessage = (e) => {
+        const { type, payload } = JSON.parse(e.data);
+        handleMsg(type, payload);
+      };
+      ws.onclose = () => setTimeout(connect, 2000);
+    }
+    connect();
+
+    function wsSend(type, payload = {}) {
+      if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type, payload }));
+    }
+
+    // ── Message Handler ──────────────────────────────────────────────
+    function handleMsg(type, p) {
+      switch (type) {
+        case 'host_joined':
+          players = p.players || [];
+          previousPlayerCount = players.length;
+          renderLobby();
+          break;
+
+        case 'player_joined':
+          players = p.players || [];
+          if (players.length > previousPlayerCount) {
+            playPopSound(); // Amelioration 7
+          }
+          previousPlayerCount = players.length;
+          renderLobby();
+          break;
+
+        case 'player_left':
+          players = p.players || [];
+          previousPlayerCount = players.length;
+          renderLobby();
+          break;
+
+        case 'game_started':
+          players = p.players || players;
+          showPhase('filling');
+          document.getElementById('fillRound').textContent = p.round;
+          document.getElementById('fillTotal').textContent = p.totalRounds;
+          document.getElementById('fillTheme').textContent = p.theme;
+          renderFillPlayers();
+          fillTimeTotal = p.timeLeft || 60;
+          updateFillTimer(fillTimeTotal);
+          break;
+
+        case 'player_ready':
+          players = p.players || players;
+          renderFillPlayers();
+          document.getElementById('fillProgress').textContent = `${p.readyCount} / ${p.totalCount} prets`;
+          break;
+
+        case 'all_tops_in':
+          break;
+
+        case 'show_top':
+          showPhase('guessing');
+          // Amelioration 3 : round info pendant guessing
+          document.getElementById('guessRound').textContent = p.round || '';
+          document.getElementById('guessRoundTotal').textContent = p.totalRounds || '';
+          document.getElementById('guessCounter').textContent = `Top ${p.topIndex + 1} / ${p.totalTops}`;
+          renderTopItems('guessItems', p.items);
+          guessTimeTotal = p.timeLeft || 30;
+          updateGuessTimer(guessTimeTotal);
+          document.getElementById('guessProgress').textContent = '0 votes';
+          break;
+
+        case 'guess_progress':
+          document.getElementById('guessProgress').textContent = `${p.count} / ${p.total} votes`;
+          break;
+
+        case 'guessing_complete':
+          showPhase('revealing');
+          document.getElementById('revealWaiting').classList.remove('hidden');
+          document.getElementById('revealAnon').classList.add('hidden');
+          document.getElementById('revealOwner').classList.add('hidden');
+          break;
+
+        case 'reveal_top':
+          currentRevealData = p;
+          showRevealAnon(p);
+          // Bug 5 fix : 2500ms pour matcher le drumroll de 2.5s
+          setTimeout(() => showRevealOwner(p), 2500);
+          break;
+
+        case 'round_complete':
+          showPhase('scores');
+          document.getElementById('roundScores').classList.remove('hidden');
+          document.getElementById('finalScores').classList.add('hidden');
+          document.getElementById('scoresLabel').textContent = `Scores — Round ${p.round}/${p.totalRounds}`;
+          renderPodium('podium', p.scores);
+          renderScoreRows('scoreRows', p.scores);
+          break;
+
+        case 'game_over':
+          showPhase('scores');
+          document.getElementById('roundScores').classList.add('hidden');
+          document.getElementById('finalScores').classList.remove('hidden');
+          document.getElementById('scoresLabel').textContent = 'Resultats finaux';
+          renderPodium('finalPodium', p.finalScores);
+          renderScoreRows('finalScoreRows', p.finalScores);
+          renderBadges(p.badges);
+          break;
+
+        case 'timer_tick':
+          updateTimerFromTick(p.timeLeft);
+          break;
+
+        case 'room_reset':
+          players = p.players || [];
+          previousPlayerCount = players.length;
+          showPhase('lobby');
+          renderLobby();
+          break;
+
+        case 'game_suspended':
+          showPhase('suspended');
+          document.getElementById('suspendedPlayers').innerHTML =
+            (p.players || []).map(pl => `
+              <div class="player-chip">
+                <div class="avatar">${avatarSVG(pl.avatar)}</div>
+                <span class="name">${pl.name}</span>
+              </div>
+            `).join('');
+          break;
+
+        case 'error':
+          console.warn('Error:', p.message);
+          break;
+      }
+    }
+
+    // ── Phase switching ──────────────────────────────────────────────
+    function showPhase(name) {
+      document.querySelectorAll('.phase').forEach(el => el.classList.remove('active'));
+      document.getElementById('phase-' + name).classList.add('active');
+    }
+
+    // ── Lobby ────────────────────────────────────────────────────────
+    function renderLobby() {
+      document.getElementById('lobbyCode').textContent = ROOM_CODE;
+      const baseUrl = location.origin;
+      const joinUrl = `${baseUrl}/?join=${ROOM_CODE}`;
+      document.getElementById('lobbyUrl').textContent = joinUrl;
+
+      const qrEl = document.getElementById('qrCode');
+      qrEl.innerHTML = '';
+      try {
+        new QRCode(qrEl, { text: joinUrl, width: 180, height: 180, colorDark: '#1C1B18', colorLight: '#FFFFFF' });
+      } catch(e) {
+        console.warn('QR code generation failed:', e.message);
+        qrEl.innerHTML = '<p class="text-muted">QR code indisponible</p>';
+      }
+
+      const wrap = document.getElementById('lobbyPlayers');
+      wrap.innerHTML = players.map(p => `
+        <div class="player-chip">
+          <div class="avatar" aria-label="${AVATAR_NAMES[p.avatar] || 'Avatar'}">${avatarSVG(p.avatar)}</div>
+          <span class="name">${p.name}</span>
+        </div>
+      `).join('');
+
+      const btn = document.getElementById('startBtn');
+      btn.disabled = players.length < 3;
+      document.getElementById('startHint').textContent =
+        players.length < 3 ? `${players.length}/3 joueurs minimum` : `${players.length} joueurs — pret !`;
+    }
+
+    document.getElementById('roundSelector').addEventListener('click', e => {
+      const btn = e.target.closest('.round-option');
+      if (!btn) return;
+      document.querySelectorAll('.round-option').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      rounds = parseInt(btn.dataset.r);
+      wsSend('set_rounds', { rounds });
+    });
+
+    function startGame() {
+      wsSend('start_game');
+    }
+
+    // ── Filling ──────────────────────────────────────────────────────
+    function renderFillPlayers() {
+      const wrap = document.getElementById('fillPlayers');
+      wrap.innerHTML = players.map(p => `
+        <div class="player-chip">
+          <div class="avatar ${p.ready ? 'ready' : ''}">${avatarSVG(p.avatar)}</div>
+          <span class="name">${p.name}</span>
+        </div>
+      `).join('');
+    }
+
+    function updateFillTimer(sec) {
+      document.getElementById('fillTimer').textContent = sec;
+      const pct = (sec / fillTimeTotal) * 100;
+      const bar = document.getElementById('fillTimerBar');
+      bar.style.width = pct + '%';
+      bar.classList.toggle('warning', sec <= 10);
+      document.getElementById('fillTimer').classList.toggle('warning', sec <= 10);
+    }
+
+    // ── Guessing ─────────────────────────────────────────────────────
+    function updateGuessTimer(sec) {
+      document.getElementById('guessTimer').textContent = sec;
+      const pct = (sec / guessTimeTotal) * 100;
+      const bar = document.getElementById('guessTimerBar');
+      bar.style.width = pct + '%';
+      bar.classList.toggle('warning', sec <= 10);
+      document.getElementById('guessTimer').classList.toggle('warning', sec <= 10);
+    }
+
+    function updateTimerFromTick(timeLeft) {
+      const phase = document.querySelector('.phase.active')?.id;
+      if (phase === 'phase-filling') updateFillTimer(timeLeft);
+      if (phase === 'phase-guessing') updateGuessTimer(timeLeft);
+    }
+
+    // ── Reveal ───────────────────────────────────────────────────────
+    function sendNextReveal() {
+      wsSend('next_reveal');
+      document.getElementById('revealWaiting').classList.add('hidden');
+    }
+
+    function showRevealAnon(p) {
+      document.getElementById('revealWaiting').classList.add('hidden');
+      document.getElementById('revealOwner').classList.add('hidden');
+      const el = document.getElementById('revealAnon');
+      el.classList.remove('hidden');
+      document.getElementById('revealCounter').textContent = `Top ${p.topIndex + 1} / ${p.totalTops}`;
+      renderTopItems('revealItems', p.items);
+      document.getElementById('revealDrumroll').classList.remove('hidden');
+      playDrumroll();
+    }
+
+    function showRevealOwner(p) {
+      document.getElementById('revealAnon').classList.add('hidden');
+      const el = document.getElementById('revealOwner');
+      el.classList.remove('hidden');
+      document.getElementById('revealCounter2').textContent = `Top ${p.topIndex + 1} / ${p.totalTops}`;
+      renderTopItems('revealItems2', p.items);
+
+      document.getElementById('revealOwnerInfo').innerHTML = `
+        ${avatarSVG(p.ownerAvatar, 72)}
+        <span class="name" style="font-size:1.5rem;font-weight:700">${p.ownerName}</span>
+      `;
+
+      const votesEl = document.getElementById('revealVotes');
+      votesEl.innerHTML = (p.guesses || []).map(g => `
+        <div class="reveal-vote ${g.correct ? 'correct' : 'wrong'}">
+          ${avatarSVG(g.voterAvatar, 28)}
+          <span>${g.voterName}</span>
+          <span>${g.correct ? '\u2713' : '\u2717'}</span>
+        </div>
+      `).join('');
+
+      playRevealSound();
+    }
+
+    // ── Scores ───────────────────────────────────────────────────────
+    function renderPodium(id, scores) {
+      const el = document.getElementById(id);
+      if (scores.length < 3) { el.innerHTML = ''; return; }
+      const order = [scores[1], scores[0], scores[2]];
+      const classes = ['second', 'first', 'third'];
+      el.innerHTML = order.map((s, i) => `
+        <div class="podium-place">
+          ${avatarSVG(s.avatar, 56)}
+          <span class="podium-name">${s.name}</span>
+          <div class="podium-bar ${classes[i]}">${s.score}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderScoreRows(id, scores) {
+      document.getElementById(id).innerHTML = scores.map((s, i) => `
+        <div class="score-row">
+          <span class="score-rank">${i + 1}</span>
+          ${avatarSVG(s.avatar, 40)}
+          <span class="score-name">${s.name}</span>
+          <span class="score-pts">${s.score} pts</span>
+        </div>
+      `).join('');
+    }
+
+    function renderBadges(badges) {
+      const el = document.getElementById('badgesWrap');
+      const items = [];
+      if (badges.bestGuesser) items.push({ icon: '\uD83C\uDFAF', title: 'Meilleur devineur', name: badges.bestGuesser.name, avatar: badges.bestGuesser.avatar });
+      if (badges.biggestMystery) items.push({ icon: '\uD83D\uDD75\uFE0F', title: 'Grand mystere', name: badges.biggestMystery.name, avatar: badges.biggestMystery.avatar });
+      if (badges.biggestSurprise) items.push({ icon: '\uD83C\uDF89', title: 'Surprise du soir', name: badges.biggestSurprise.name, avatar: badges.biggestSurprise.avatar });
+      el.innerHTML = items.map(b => `
+        <div class="badge">
+          <span class="badge-icon">${b.icon}</span>
+          <span class="badge-title">${b.title}</span>
+          ${avatarSVG(b.avatar, 40)}
+          <span class="badge-name">${b.name}</span>
+        </div>
+      `).join('');
+    }
+
+    // Amelioration 4 : bouton next round
+    function sendNextRound() {
+      wsSend('next_round');
+    }
+
+    function sendPlayAgain() {
+      wsSend('play_again');
+    }
+
+    // ── Sounds (Web Audio API) ───────────────────────────────────────
+    let audioCtx;
+    function getAudioCtx() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return audioCtx;
+    }
+
+    // Amelioration 6 : mute toggle
+    function toggleMute() {
+      isMuted = !isMuted;
+      document.getElementById('muteIcon').innerHTML = isMuted ? '&#128263;' : '&#128264;';
+      if (audioCtx && isMuted) {
+        audioCtx.suspend();
+      } else if (audioCtx && !isMuted) {
+        audioCtx.resume();
+      }
+    }
+
+    function playDrumroll() {
+      if (isMuted) return;
+      try {
+        const ctx = getAudioCtx();
+        const duration = 2.5;
+        const steps = 20;
+        for (let i = 0; i < steps; i++) {
+          const t = ctx.currentTime + (i / steps) * duration;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.value = 200 + Math.random() * 100;
+          gain.gain.setValueAtTime(0.08, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.08);
+        }
+      } catch(e) {}
+    }
+
+    function playRevealSound() {
+      if (isMuted) return;
+      try {
+        const ctx = getAudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(400, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.4);
+      } catch(e) {}
+    }
+
+    // Amelioration 7 : son pop quand un joueur rejoint
+    function playPopSound() {
+      if (isMuted) return;
+      try {
+        const ctx = getAudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(900, ctx.currentTime + 0.08);
+        osc.frequency.exponentialRampToValueAtTime(700, ctx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.2);
+      } catch(e) {}
+    }
+  </script>
+</body>
+</html>

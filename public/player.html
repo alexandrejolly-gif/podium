@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Podium</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .fill-input { position: relative; }
+    .fill-input .medal-label {
+      position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+      font-size: 1.3rem; pointer-events: none;
+    }
+    .fill-input input { padding-left: 2.8rem; }
+    .waiting-pulse {
+      width: 60px; height: 60px; border-radius: 50%; background: var(--coral-light);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .my-score-big {
+      font-size: 3rem; font-weight: 700; color: var(--coral);
+      animation: pop 0.4s cubic-bezier(.34,1.56,.64,1);
+    }
+    .my-rank { font-size: 1.2rem; color: var(--muted); font-weight: 600; }
+    /* Amelioration 9 : banniere hote deconnecte */
+    .host-banner {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: #E74C3C; color: white; text-align: center;
+      padding: 0.6rem 1rem; font-weight: 600; font-size: 0.9rem;
+      animation: fade-up 0.3s ease;
+    }
+    .host-banner.reconnected {
+      background: var(--teal);
+    }
+    .online-progress {
+      font-size: 0.9rem; color: var(--muted); font-weight: 600;
+      margin-top: 0.5rem; text-align: center;
+    }
+    .online-reveal-card {
+      width: 100%;
+    }
+    .online-reveal-result {
+      margin-top: 1rem;
+      animation: fade-up 0.4s ease both;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Amelioration 9 : banniere hote deconnecte -->
+  <div id="hostBanner" class="host-banner hidden">L'hote s'est deconnecte...</div>
+
+  <div class="container">
+
+    <!-- ONBOARDING -->
+    <div id="phase-onboarding" class="phase active center">
+      <div class="logo" style="margin-bottom:0.25rem">Podium</div>
+      <p class="text-muted mb-2">Rejoindre la salle <strong id="onboardCode"></strong></p>
+
+      <div class="input-group mb-2">
+        <label for="nameInput">Ton prenom</label>
+        <input id="nameInput" class="input" type="text" maxlength="20" placeholder="Prenom" autocomplete="off">
+      </div>
+
+      <label id="avatarLabel" style="font-weight:600;font-size:0.9rem;display:block;text-align:left;margin-bottom:0.25rem">Ton avatar</label>
+      <div class="avatar-grid" id="avatarGrid" role="radiogroup" aria-labelledby="avatarLabel"></div>
+
+      <button id="joinBtn" class="btn btn-primary btn-large btn-full mt-2" onclick="joinRoom()" aria-label="Rejoindre la salle">
+        Rejoindre
+      </button>
+      <p id="onboardError" class="text-coral mt-1 text-center hidden" role="alert"></p>
+    </div>
+
+    <!-- LOBBY -->
+    <div id="phase-lobby" class="phase center">
+      <div class="logo" style="font-size:1.5rem;margin-bottom:0.5rem">Podium</div>
+      <p class="text-muted">Tu es dans la salle <strong id="lobbyCode2"></strong></p>
+      <div class="spacer"></div>
+      <p class="host-phase-label">Joueurs</p>
+      <div class="player-list" id="lobbyPlayers" aria-live="polite"></div>
+      <div class="spacer"></div>
+
+      <!-- Presentiel: waiting message -->
+      <div id="lobbyWaiting" class="center">
+        <div class="waiting-pulse"></div>
+        <p class="text-muted mt-2">En attente du lancement...</p>
+      </div>
+
+      <!-- Online: host-player controls -->
+      <div id="lobbyHostControls" class="hidden center">
+        <p class="text-muted mb-2">Nombre de rounds</p>
+        <div class="round-selector" id="roundSelector" role="group" aria-label="Nombre de rounds">
+          <button class="round-option" data-r="3" aria-label="3 rounds">3</button>
+          <button class="round-option selected" data-r="5" aria-label="5 rounds">5</button>
+          <button class="round-option" data-r="7" aria-label="7 rounds">7</button>
+        </div>
+        <div class="spacer"></div>
+        <button id="onlineStartBtn" class="btn btn-primary btn-large" disabled onclick="onlineStartGame()" aria-label="Demarrer la partie">
+          Demarrer
+        </button>
+        <p id="onlineStartHint" class="text-muted mt-1">3 joueurs minimum</p>
+      </div>
+    </div>
+
+    <!-- FILLING -->
+    <div id="phase-filling" class="phase">
+      <p class="host-phase-label text-center">Round <span id="pFillRound">1</span>/<span id="pFillTotal">5</span></p>
+      <p class="theme-text text-center mt-1" id="pFillTheme"></p>
+      <div class="timer-bar-wrap mt-2">
+        <div class="timer-bar" id="pFillTimerBar" style="width:100%" role="progressbar"></div>
+      </div>
+      <p class="timer-text text-center" id="pFillTimer" aria-live="polite">60</p>
+
+      <div id="fillForm" class="mt-3">
+        <div class="fill-input mb-2">
+          <span class="medal-label" aria-hidden="true">&#x1F947;</span>
+          <input id="item1" class="input" type="text" maxlength="60" placeholder="Ton #1" aria-label="Premier choix">
+        </div>
+        <div class="fill-input mb-2">
+          <span class="medal-label" aria-hidden="true">&#x1F948;</span>
+          <input id="item2" class="input" type="text" maxlength="60" placeholder="Ton #2" aria-label="Deuxieme choix">
+        </div>
+        <div class="fill-input mb-2">
+          <span class="medal-label" aria-hidden="true">&#x1F949;</span>
+          <input id="item3" class="input" type="text" maxlength="60" placeholder="Ton #3" aria-label="Troisieme choix">
+        </div>
+        <button id="submitTopBtn" class="btn btn-teal btn-large btn-full mt-2" onclick="submitTop()">
+          Valider
+        </button>
+      </div>
+
+      <div id="fillSent" class="hidden center mt-3">
+        <div class="checkmark-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+        <p style="font-weight:600;font-size:1.1rem">Top envoye !</p>
+        <p class="text-muted">En attente des autres joueurs...</p>
+        <p id="fillProgress" class="online-progress hidden"></p>
+      </div>
+    </div>
+
+    <!-- GUESSING -->
+    <div id="phase-guessing" class="phase">
+      <!-- Own top : wait -->
+      <div id="guessOwnTop" class="hidden center" style="padding:2rem 0">
+        <p style="font-size:1.2rem;font-weight:600">C'est ton top !</p>
+        <p class="text-muted">Attends le prochain...</p>
+        <p id="guessOwnProgress" class="online-progress hidden"></p>
+      </div>
+
+      <!-- Others' top : guess -->
+      <div id="guessForm">
+        <!-- Amelioration 3 : round info pendant guessing -->
+        <p class="host-phase-label text-center">Round <span id="pGuessRound">1</span>/<span id="pGuessRoundTotal">5</span></p>
+        <p class="top-counter text-center" id="pGuessCounter">Top 1 / ?</p>
+        <ul class="top-items" id="pGuessItems" aria-label="Top anonyme"></ul>
+        <div class="timer-bar-wrap">
+          <div class="timer-bar" id="pGuessTimerBar" style="width:100%" role="progressbar"></div>
+        </div>
+        <!-- Amelioration 8 : timer en secondes cote joueur -->
+        <p class="timer-text text-center" id="pGuessTimer" aria-live="polite">30</p>
+
+        <p class="text-center text-muted mt-1" style="font-weight:600">Qui a ecrit ce top ?</p>
+        <div class="guess-grid" id="guessGrid" role="radiogroup" aria-label="Choisis un joueur"></div>
+        <button id="confirmGuessBtn" class="btn btn-primary btn-large btn-full mt-1" disabled onclick="confirmGuess()">
+          Confirmer
+        </button>
+      </div>
+
+      <!-- After guess confirmed -->
+      <div id="guessConfirmed" class="hidden center" style="padding:2rem 0">
+        <div class="checkmark-wrap" style="background:var(--coral)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+        <p style="font-weight:600">Vote envoye !</p>
+        <p id="guessConfirmedProgress" class="online-progress hidden"></p>
+      </div>
+    </div>
+
+    <!-- REVEALING -->
+    <div id="phase-revealing" class="phase center">
+      <!-- Presentiel mode: simple waiting -->
+      <div id="revealPresentiel">
+        <div class="logo" style="font-size:1.3rem;margin-bottom:1rem">Podium</div>
+        <div class="waiting-pulse"></div>
+        <p class="text-muted mt-2">Regarde l'ecran principal...</p>
+
+        <div id="revealPlayerResult" class="hidden mt-3">
+          <div class="card text-center">
+            <div id="revealResultContent" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Online mode: full reveal experience -->
+      <div id="revealOnline" class="hidden" style="width:100%">
+        <!-- Waiting for host-player to click reveal -->
+        <div id="onlineRevealWaiting" class="center">
+          <div class="logo" style="font-size:1.3rem;margin-bottom:1rem">Podium</div>
+          <p class="text-muted" id="onlineRevealWaitText">Pret pour la revelation ?</p>
+          <button id="onlineRevealBtn" class="btn btn-primary btn-large mt-2 hidden" onclick="onlineNextReveal()">Reveler</button>
+        </div>
+
+        <!-- Drumroll phase -->
+        <div id="onlineRevealDrumroll" class="hidden center">
+          <p class="top-counter" id="onlineRevealCounter"></p>
+          <ul class="top-items" id="onlineRevealItems"></ul>
+          <div class="drumroll">
+            <div class="drumroll-dot"></div>
+            <div class="drumroll-dot"></div>
+            <div class="drumroll-dot"></div>
+          </div>
+        </div>
+
+        <!-- Revealed owner + votes + personal result -->
+        <div id="onlineRevealOwner" class="hidden">
+          <p class="top-counter text-center" id="onlineRevealCounter2"></p>
+          <ul class="top-items" id="onlineRevealItems2"></ul>
+          <div class="reveal-owner center" id="onlineRevealOwnerInfo"></div>
+          <div class="reveal-votes mt-2" id="onlineRevealVotes" style="justify-content:center"></div>
+          <div id="onlineRevealMyResult" class="online-reveal-result center"></div>
+          <div class="spacer"></div>
+          <div id="onlineRevealNextWrap" class="center">
+            <button id="onlineRevealNextBtn" class="btn btn-primary btn-large hidden" onclick="onlineNextReveal()">Suivant</button>
+            <p id="onlineRevealNextWait" class="text-muted hidden">En attente...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCORES -->
+    <div id="phase-scores" class="phase center">
+      <div class="logo" style="font-size:1.3rem;margin-bottom:1rem">Podium</div>
+
+      <!-- Presentiel: simple score display -->
+      <div id="pScoreContent">
+        <p class="my-score-big" id="pMyScore">0</p>
+        <p class="text-muted">points</p>
+        <p class="my-rank mt-1" id="pMyRank"></p>
+        <div class="spacer"></div>
+        <div class="card" style="width:100%">
+          <div id="pScoreRows"></div>
+        </div>
+        <p id="pScoreWaiting" class="text-muted mt-2">En attente du prochain round...</p>
+        <button id="pScoreNextBtn" class="btn btn-primary btn-large mt-2 hidden" onclick="onlineNextRound()">Round suivant</button>
+      </div>
+
+      <div id="pFinalContent" class="hidden">
+        <p style="font-size:1.2rem;font-weight:700;margin-bottom:0.5rem">Partie terminee !</p>
+        <div class="podium" id="pOnlinePodium"></div>
+        <p class="my-score-big" id="pFinalScore">0</p>
+        <p class="text-muted">points</p>
+        <p class="my-rank mt-1" id="pFinalRank"></p>
+        <div class="badges mt-2" id="pBadges" aria-label="Badges"></div>
+        <div class="card mt-2" style="width:100%">
+          <div id="pFinalScoreRows"></div>
+        </div>
+        <button id="pFinalPlayAgainBtn" class="btn btn-primary btn-large mt-2 hidden" onclick="onlinePlayAgain()">Rejouer</button>
+      </div>
+    </div>
+
+    <!-- SUSPENDED -->
+    <div id="phase-suspended" class="phase center">
+      <div class="logo" style="font-size:1.3rem;margin-bottom:1rem">Podium</div>
+      <p style="font-size:1.1rem;font-weight:600">Partie suspendue</p>
+      <p class="text-muted mt-1">Pas assez de joueurs pour continuer.</p>
+    </div>
+
+  </div>
+
+  <script src="/shared.js"></script>
+  <script>
+    // ── State ────────────────────────────────────────────────────────
+    const params = new URLSearchParams(location.search);
+    const ROOM_CODE = params.get('code');
+    if (!ROOM_CODE) location.href = '/';
+
+    let ws;
+    let myId = sessionStorage.getItem('topmine_playerId_' + ROOM_CODE);
+    let myName = '';
+    let myAvatar = 0;
+    let selectedAvatar = 0;
+    let players = [];
+    let currentTopIndex = null;
+    let selectedGuessId = null;
+    let guessedTops = new Set();
+    let fillTimeTotal = 60;
+    let guessTimeTotal = 30;
+
+    // Online mode state
+    let isOnlineMode = false;
+    let isHostPlayer = params.get('host') === '1';
+    let totalReveals = 0;
+    let currentRevealIndex = 0;
+    let isMuted = false;
+
+    function isHostPlayerFn() {
+      return isOnlineMode && isHostPlayer;
+    }
+
+    // ── Vibration helper (amelioration 2) ────────────────────────────
+    function vibrate(ms) {
+      try { if (navigator.vibrate) navigator.vibrate(ms); } catch(e) {}
+    }
+
+    // ── Onboarding ──────────────────────────────────────────────────
+    document.getElementById('onboardCode').textContent = ROOM_CODE;
+
+    const urlName = params.get('name');
+    if (urlName) document.getElementById('nameInput').value = decodeURIComponent(urlName);
+
+    const grid = document.getElementById('avatarGrid');
+    for (let i = 0; i < 8; i++) {
+      const div = document.createElement('div');
+      div.className = 'avatar-option' + (i === 0 ? ' selected' : '');
+      div.setAttribute('role', 'radio');
+      div.setAttribute('aria-checked', i === 0 ? 'true' : 'false');
+      div.setAttribute('aria-label', AVATAR_NAMES[i]);
+      div.setAttribute('tabindex', '0');
+      div.innerHTML = avatarSVG(i, 48);
+      div.onclick = () => {
+        document.querySelectorAll('.avatar-option').forEach(el => {
+          el.classList.remove('selected');
+          el.setAttribute('aria-checked', 'false');
+        });
+        div.classList.add('selected');
+        div.setAttribute('aria-checked', 'true');
+        selectedAvatar = i;
+      };
+      div.onkeydown = (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); div.click(); }
+      };
+      grid.appendChild(div);
+    }
+
+    // ── WebSocket ────────────────────────────────────────────────────
+    function connect() {
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      ws = new WebSocket(`${proto}://${location.host}`);
+      ws.onopen = () => {
+        if (myId) {
+          ws.send(JSON.stringify({ type: 'reconnect', payload: { code: ROOM_CODE, playerId: myId } }));
+        }
+      };
+      ws.onmessage = (e) => {
+        const { type, payload } = JSON.parse(e.data);
+        handleMsg(type, payload);
+      };
+      ws.onclose = () => setTimeout(connect, 2000);
+    }
+    connect();
+
+    function wsSend(type, payload = {}) {
+      if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type, payload }));
+    }
+
+    // ── Join ─────────────────────────────────────────────────────────
+    function joinRoom() {
+      const name = document.getElementById('nameInput').value.trim();
+      if (!name) {
+        showOnboardError('Prenom requis');
+        return;
+      }
+      myName = name;
+      myAvatar = selectedAvatar;
+      wsSend('join_room', { code: ROOM_CODE, playerName: name, avatar: selectedAvatar });
+    }
+
+    function showOnboardError(msg) {
+      const el = document.getElementById('onboardError');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      el.style.animation = 'none';
+      el.offsetHeight;
+      el.style.animation = 'shake 0.3s';
+    }
+
+    document.getElementById('nameInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') joinRoom();
+    });
+
+    // ── Message Handler ──────────────────────────────────────────────
+    function handleMsg(type, p) {
+      switch (type) {
+        case 'room_joined':
+          myId = p.playerId;
+          sessionStorage.setItem('topmine_playerId_' + ROOM_CODE, myId);
+          players = p.players || [];
+          if (p.mode === 'online') {
+            isOnlineMode = true;
+            if (p.isHostPlayer) isHostPlayer = true;
+          }
+          showPhase('lobby');
+          renderLobby();
+          vibrate(50);
+          break;
+
+        case 'reconnected':
+          players = p.players || [];
+          if (p.mode === 'online') {
+            isOnlineMode = true;
+            if (p.isHostPlayer) isHostPlayer = true;
+          }
+          hideHostBanner();
+          if (p.state === 'lobby') {
+            showPhase('lobby');
+            renderLobby();
+          } else if (p.state === 'filling') {
+            showPhase('filling');
+            document.getElementById('pFillTheme').textContent = p.theme;
+            document.getElementById('pFillRound').textContent = p.round;
+            document.getElementById('pFillTotal').textContent = p.totalRounds;
+          } else if (p.state === 'guessing') {
+            showPhase('guessing');
+            if (p.currentTop) {
+              currentTopIndex = p.currentTop.topIndex;
+              if (p.currentTop.isOwnTop) {
+                document.getElementById('guessOwnTop').classList.remove('hidden');
+                document.getElementById('guessForm').classList.add('hidden');
+                document.getElementById('guessConfirmed').classList.add('hidden');
+              } else {
+                document.getElementById('guessOwnTop').classList.add('hidden');
+                document.getElementById('guessForm').classList.remove('hidden');
+                document.getElementById('guessConfirmed').classList.add('hidden');
+                document.getElementById('pGuessCounter').textContent = `Top ${p.currentTop.topIndex + 1} / ${p.currentTop.totalTops}`;
+                document.getElementById('pGuessRound').textContent = p.round;
+                document.getElementById('pGuessRoundTotal').textContent = p.totalRounds;
+                renderTopItems('pGuessItems', p.currentTop.items);
+                renderGuessGrid(p.currentTop.players || []);
+                document.getElementById('confirmGuessBtn').disabled = true;
+              }
+            }
+          } else if (p.state === 'revealing') {
+            showPhase('revealing');
+            setupRevealPhase();
+          } else if (p.state === 'scores') {
+            showPhase('scores');
+          }
+          break;
+
+        case 'player_joined':
+        case 'player_left':
+          players = p.players || [];
+          renderLobby();
+          break;
+
+        case 'game_started':
+          showPhase('filling');
+          document.getElementById('pFillRound').textContent = p.round;
+          document.getElementById('pFillTotal').textContent = p.totalRounds;
+          document.getElementById('pFillTheme').textContent = p.theme;
+          fillTimeTotal = p.timeLeft || 60;
+          updateFillTimer(fillTimeTotal);
+          document.getElementById('fillForm').classList.remove('hidden');
+          document.getElementById('fillSent').classList.add('hidden');
+          document.getElementById('item1').value = '';
+          document.getElementById('item2').value = '';
+          document.getElementById('item3').value = '';
+          guessedTops.clear();
+          break;
+
+        case 'timer_tick':
+          updateTimerTick(p.timeLeft);
+          break;
+
+        case 'player_ready':
+          if (isOnlineMode) {
+            const prog = `${p.readyCount} / ${p.totalCount} prets`;
+            const el = document.getElementById('fillProgress');
+            if (el) { el.textContent = prog; el.classList.remove('hidden'); }
+          }
+          break;
+
+        case 'all_tops_in':
+          break;
+
+        case 'show_top':
+          showPhase('guessing');
+          currentTopIndex = p.topIndex;
+          selectedGuessId = null;
+          guessTimeTotal = p.timeLeft || 30;
+
+          if (p.isOwnTop) {
+            document.getElementById('guessOwnTop').classList.remove('hidden');
+            document.getElementById('guessForm').classList.add('hidden');
+            document.getElementById('guessConfirmed').classList.add('hidden');
+          } else if (guessedTops.has(p.topIndex)) {
+            document.getElementById('guessOwnTop').classList.add('hidden');
+            document.getElementById('guessForm').classList.add('hidden');
+            document.getElementById('guessConfirmed').classList.remove('hidden');
+          } else {
+            document.getElementById('guessOwnTop').classList.add('hidden');
+            document.getElementById('guessForm').classList.remove('hidden');
+            document.getElementById('guessConfirmed').classList.add('hidden');
+
+            document.getElementById('pGuessRound').textContent = p.round || '';
+            document.getElementById('pGuessRoundTotal').textContent = p.totalRounds || '';
+            document.getElementById('pGuessCounter').textContent = `Top ${p.topIndex + 1} / ${p.totalTops}`;
+            renderTopItems('pGuessItems', p.items);
+            renderGuessGrid(p.players || []);
+            document.getElementById('confirmGuessBtn').disabled = true;
+            updateGuessTimer(guessTimeTotal);
+          }
+          break;
+
+        case 'guess_received':
+          guessedTops.add(p.topIndex);
+          document.getElementById('guessForm').classList.add('hidden');
+          document.getElementById('guessConfirmed').classList.remove('hidden');
+          vibrate(50);
+          break;
+
+        case 'guess_progress':
+          if (isOnlineMode) {
+            const prog = `${p.count} / ${p.total} votes`;
+            const el1 = document.getElementById('guessOwnProgress');
+            const el2 = document.getElementById('guessConfirmedProgress');
+            if (el1) { el1.textContent = prog; el1.classList.remove('hidden'); }
+            if (el2) { el2.textContent = prog; el2.classList.remove('hidden'); }
+          }
+          break;
+
+        case 'guessing_complete':
+          showPhase('revealing');
+          if (isOnlineMode) {
+            totalReveals = p.totalReveals || 0;
+            currentRevealIndex = 0;
+            setupRevealPhase();
+          } else {
+            document.getElementById('revealPlayerResult').classList.add('hidden');
+          }
+          break;
+
+        case 'reveal_top':
+          if (isOnlineMode) {
+            showOnlineReveal(p);
+          }
+          break;
+
+        case 'reveal_player_result':
+          if (!isOnlineMode) {
+            showRevealResult(p);
+            vibrate(p.correct || p.isOwnTop ? [50, 30, 50] : 30);
+          }
+          break;
+
+        case 'round_complete':
+          showPhase('scores');
+          document.getElementById('pScoreContent').classList.remove('hidden');
+          document.getElementById('pFinalContent').classList.add('hidden');
+          renderMyScores(p.scores);
+          if (isOnlineMode) {
+            document.getElementById('pScoreWaiting').classList.add('hidden');
+            if (isHostPlayerFn()) {
+              document.getElementById('pScoreNextBtn').classList.remove('hidden');
+            } else {
+              document.getElementById('pScoreNextBtn').classList.add('hidden');
+              document.getElementById('pScoreWaiting').classList.remove('hidden');
+            }
+          }
+          break;
+
+        case 'game_over':
+          showPhase('scores');
+          document.getElementById('pScoreContent').classList.add('hidden');
+          document.getElementById('pFinalContent').classList.remove('hidden');
+          renderFinalScores(p.finalScores, p.badges);
+          if (isOnlineMode) {
+            renderPodium('pOnlinePodium', p.finalScores);
+            if (isHostPlayerFn()) {
+              document.getElementById('pFinalPlayAgainBtn').classList.remove('hidden');
+            }
+          }
+          vibrate([100, 50, 100, 50, 100]);
+          break;
+
+        case 'room_reset':
+          players = p.players || [];
+          showPhase('lobby');
+          renderLobby();
+          break;
+
+        case 'host_disconnected':
+          if (!isOnlineMode) showHostBanner();
+          break;
+
+        case 'promoted_to_host':
+          isHostPlayer = true;
+          // Re-render current phase with host controls
+          const activePhase = document.querySelector('.phase.active')?.id;
+          if (activePhase === 'phase-lobby') renderLobby();
+          else if (activePhase === 'phase-revealing') setupRevealControls();
+          else if (activePhase === 'phase-scores') setupScoreControls();
+          break;
+
+        case 'game_suspended':
+          showPhase('suspended');
+          break;
+
+        case 'error':
+          if (document.querySelector('#phase-onboarding.active')) {
+            showOnboardError(p.message);
+          }
+          break;
+      }
+    }
+
+    // ── Phase switching ──────────────────────────────────────────────
+    function showPhase(name) {
+      document.querySelectorAll('.phase').forEach(el => el.classList.remove('active'));
+      document.getElementById('phase-' + name).classList.add('active');
+    }
+
+    // ── Host banner (amelioration 9) ─────────────────────────────────
+    let hostBannerTimeout;
+    function showHostBanner() {
+      const el = document.getElementById('hostBanner');
+      el.textContent = "L'hote s'est deconnecte...";
+      el.className = 'host-banner';
+      clearTimeout(hostBannerTimeout);
+    }
+    function hideHostBanner() {
+      const el = document.getElementById('hostBanner');
+      el.textContent = 'Hote reconnecte !';
+      el.className = 'host-banner reconnected';
+      hostBannerTimeout = setTimeout(() => el.classList.add('hidden'), 3000);
+    }
+
+    // ── Lobby ────────────────────────────────────────────────────────
+    function renderLobby() {
+      document.getElementById('lobbyCode2').textContent = ROOM_CODE;
+      const wrap = document.getElementById('lobbyPlayers');
+      wrap.innerHTML = players.map(p => `
+        <div class="player-chip">
+          <div class="avatar" aria-label="${AVATAR_NAMES[p.avatar] || 'Avatar'}">${avatarSVG(p.avatar)}</div>
+          <span class="name">${p.name}</span>
+        </div>
+      `).join('');
+
+      if (isOnlineMode) {
+        document.getElementById('lobbyWaiting').classList.add('hidden');
+        if (isHostPlayerFn()) {
+          document.getElementById('lobbyHostControls').classList.remove('hidden');
+          const btn = document.getElementById('onlineStartBtn');
+          btn.disabled = players.length < 3;
+          document.getElementById('onlineStartHint').textContent =
+            players.length < 3 ? `${players.length}/3 joueurs minimum` : `${players.length} joueurs — pret !`;
+        } else {
+          document.getElementById('lobbyHostControls').classList.add('hidden');
+          document.getElementById('lobbyWaiting').classList.remove('hidden');
+        }
+      } else {
+        document.getElementById('lobbyWaiting').classList.remove('hidden');
+        document.getElementById('lobbyHostControls').classList.add('hidden');
+      }
+    }
+
+    // Round selector for online host-player
+    document.getElementById('roundSelector').addEventListener('click', e => {
+      const btn = e.target.closest('.round-option');
+      if (!btn) return;
+      document.querySelectorAll('.round-option').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      wsSend('set_rounds', { rounds: parseInt(btn.dataset.r) });
+    });
+
+    function onlineStartGame() {
+      wsSend('start_game');
+    }
+
+    // ── Filling ──────────────────────────────────────────────────────
+    function submitTop() {
+      const items = [
+        document.getElementById('item1').value.trim(),
+        document.getElementById('item2').value.trim(),
+        document.getElementById('item3').value.trim(),
+      ];
+      if (items.some(i => !i)) return;
+      wsSend('submit_top', { items });
+      document.getElementById('fillForm').classList.add('hidden');
+      document.getElementById('fillSent').classList.remove('hidden');
+      vibrate(50);
+    }
+
+    function updateFillTimer(sec) {
+      document.getElementById('pFillTimer').textContent = sec;
+      const pct = (sec / fillTimeTotal) * 100;
+      const bar = document.getElementById('pFillTimerBar');
+      bar.style.width = pct + '%';
+      bar.classList.toggle('warning', sec <= 10);
+      document.getElementById('pFillTimer').classList.toggle('warning', sec <= 10);
+    }
+
+    // ── Guessing ─────────────────────────────────────────────────────
+    function renderGuessGrid(playersList) {
+      const gridEl = document.getElementById('guessGrid');
+      gridEl.innerHTML = playersList.map(p => `
+        <div class="guess-option" data-id="${p.id}" onclick="selectGuess('${p.id}')"
+             role="radio" aria-checked="false" aria-label="${escapeHtml(p.name)}" tabindex="0">
+          ${avatarSVG(p.avatar, 48)}
+          <span class="name">${escapeHtml(p.name)}</span>
+        </div>
+      `).join('');
+    }
+
+    function selectGuess(id) {
+      selectedGuessId = id;
+      document.querySelectorAll('.guess-option').forEach(el => {
+        const sel = el.dataset.id === id;
+        el.classList.toggle('selected', sel);
+        el.setAttribute('aria-checked', sel ? 'true' : 'false');
+      });
+      document.getElementById('confirmGuessBtn').disabled = false;
+      vibrate(30);
+    }
+
+    function confirmGuess() {
+      if (!selectedGuessId || currentTopIndex === null) return;
+      wsSend('submit_guess', { topIndex: currentTopIndex, guessedPlayerId: selectedGuessId });
+    }
+
+    function updateGuessTimer(sec) {
+      const bar = document.getElementById('pGuessTimerBar');
+      const text = document.getElementById('pGuessTimer');
+      if (bar) {
+        const pct = (sec / guessTimeTotal) * 100;
+        bar.style.width = pct + '%';
+        bar.classList.toggle('warning', sec <= 10);
+      }
+      if (text) {
+        text.textContent = sec;
+        text.classList.toggle('warning', sec <= 10);
+      }
+    }
+
+    function updateTimerTick(timeLeft) {
+      const phase = document.querySelector('.phase.active')?.id;
+      if (phase === 'phase-filling') updateFillTimer(timeLeft);
+      if (phase === 'phase-guessing') updateGuessTimer(timeLeft);
+    }
+
+    // ── Reveal (presentiel) ──────────────────────────────────────────
+    function showRevealResult(p) {
+      const el = document.getElementById('revealPlayerResult');
+      el.classList.remove('hidden');
+      el.style.animation = 'none';
+      el.offsetHeight;
+      el.style.animation = 'pop .4s cubic-bezier(.34,1.56,.64,1)';
+
+      let html = '';
+      if (p.isOwnTop) {
+        html = `
+          <p style="font-size:1.1rem;font-weight:700;margin-bottom:0.5rem">C'etait ton top !</p>
+          ${p.pointsEarned > 0 ? `<p class="text-teal" style="font-size:1.3rem;font-weight:700">+${p.pointsEarned} pts</p>` : '<p class="text-muted">+0 pt</p>'}
+        `;
+      } else {
+        html = `
+          <p style="font-size:0.9rem;margin-bottom:0.5rem">C'etait le top de</p>
+          <div style="display:flex;align-items:center;justify-content:center;gap:0.5rem;margin-bottom:0.5rem">
+            ${avatarSVG(p.ownerAvatar, 36)}
+            <span style="font-weight:700">${p.ownerName}</span>
+          </div>
+          ${p.correct
+            ? `<p class="text-teal" style="font-size:1.3rem;font-weight:700">Bien devine ! +${p.pointsEarned} pts</p>`
+            : `<p class="text-coral" style="font-weight:600">Rate !</p>`
+          }
+        `;
+      }
+      html += `<p class="text-muted mt-1">Score total : ${p.myScore} pts</p>`;
+      document.getElementById('revealResultContent').innerHTML = html;
+    }
+
+    // ── Reveal (online) ──────────────────────────────────────────────
+    function setupRevealPhase() {
+      if (!isOnlineMode) {
+        document.getElementById('revealPresentiel').classList.remove('hidden');
+        document.getElementById('revealOnline').classList.add('hidden');
+        document.getElementById('revealPlayerResult').classList.add('hidden');
+        return;
+      }
+      document.getElementById('revealPresentiel').classList.add('hidden');
+      document.getElementById('revealOnline').classList.remove('hidden');
+      document.getElementById('onlineRevealWaiting').classList.remove('hidden');
+      document.getElementById('onlineRevealDrumroll').classList.add('hidden');
+      document.getElementById('onlineRevealOwner').classList.add('hidden');
+      setupRevealControls();
+    }
+
+    function setupRevealControls() {
+      if (isHostPlayerFn()) {
+        document.getElementById('onlineRevealBtn').classList.remove('hidden');
+        document.getElementById('onlineRevealWaitText').textContent = 'Pret pour la revelation ?';
+      } else {
+        document.getElementById('onlineRevealBtn').classList.add('hidden');
+        document.getElementById('onlineRevealWaitText').textContent = 'En attente de la revelation...';
+      }
+    }
+
+    function setupScoreControls() {
+      if (isHostPlayerFn()) {
+        document.getElementById('pScoreNextBtn').classList.remove('hidden');
+        document.getElementById('pScoreWaiting').classList.add('hidden');
+        document.getElementById('pFinalPlayAgainBtn').classList.remove('hidden');
+      }
+    }
+
+    function onlineNextReveal() {
+      wsSend('next_reveal');
+      document.getElementById('onlineRevealBtn').classList.add('hidden');
+    }
+
+    function showOnlineReveal(p) {
+      // Phase 1: drumroll with anonymous top
+      document.getElementById('onlineRevealWaiting').classList.add('hidden');
+      document.getElementById('onlineRevealOwner').classList.add('hidden');
+      const drumEl = document.getElementById('onlineRevealDrumroll');
+      drumEl.classList.remove('hidden');
+      document.getElementById('onlineRevealCounter').textContent = `Top ${p.topIndex + 1} / ${p.totalTops}`;
+      renderTopItems('onlineRevealItems', p.items);
+      playDrumroll();
+
+      // Phase 2: reveal owner after 2.5s
+      setTimeout(() => {
+        drumEl.classList.add('hidden');
+        const ownerEl = document.getElementById('onlineRevealOwner');
+        ownerEl.classList.remove('hidden');
+        document.getElementById('onlineRevealCounter2').textContent = `Top ${p.topIndex + 1} / ${p.totalTops}`;
+        renderTopItems('onlineRevealItems2', p.items);
+
+        document.getElementById('onlineRevealOwnerInfo').innerHTML = `
+          ${avatarSVG(p.ownerAvatar, 72)}
+          <span style="font-size:1.5rem;font-weight:700">${escapeHtml(p.ownerName)}</span>
+        `;
+
+        // Votes
+        document.getElementById('onlineRevealVotes').innerHTML = (p.guesses || []).map(g => `
+          <div class="reveal-vote ${g.correct ? 'correct' : 'wrong'}">
+            ${avatarSVG(g.voterAvatar, 28)}
+            <span>${escapeHtml(g.voterName)}</span>
+            <span>${g.correct ? '\u2713' : '\u2717'}</span>
+          </div>
+        `).join('');
+
+        // Personal result
+        let resultHtml = '';
+        if (p.isMyTop) {
+          resultHtml = `
+            <p style="font-weight:700;margin-bottom:0.25rem">C'etait ton top !</p>
+            ${p.myPointsEarned > 0 ? `<p class="text-teal" style="font-size:1.2rem;font-weight:700">+${p.myPointsEarned} pts</p>` : '<p class="text-muted">+0 pt</p>'}
+          `;
+        } else {
+          resultHtml = p.myCorrect
+            ? `<p class="text-teal" style="font-size:1.2rem;font-weight:700">Bien devine ! +${p.myPointsEarned} pts</p>`
+            : `<p class="text-coral" style="font-weight:600">Rate !</p>`;
+        }
+        resultHtml += `<p class="text-muted" style="font-size:0.85rem">Score : ${p.myScore} pts</p>`;
+        document.getElementById('onlineRevealMyResult').innerHTML = resultHtml;
+
+        // Next button for host-player
+        if (isHostPlayerFn()) {
+          document.getElementById('onlineRevealNextBtn').classList.remove('hidden');
+          document.getElementById('onlineRevealNextWait').classList.add('hidden');
+        } else {
+          document.getElementById('onlineRevealNextBtn').classList.add('hidden');
+          document.getElementById('onlineRevealNextWait').classList.remove('hidden');
+        }
+
+        playRevealSound();
+        vibrate(p.myCorrect || p.isMyTop ? [50, 30, 50] : 30);
+      }, 2500);
+
+      currentRevealIndex++;
+    }
+
+    function onlineNextRound() {
+      wsSend('next_round');
+    }
+
+    function onlinePlayAgain() {
+      wsSend('play_again');
+    }
+
+    // ── Scores ───────────────────────────────────────────────────────
+    function renderMyScores(scores) {
+      const me = scores.find(s => s.id === myId);
+      document.getElementById('pMyScore').textContent = me ? me.score : 0;
+      const rank = scores.findIndex(s => s.id === myId) + 1;
+      document.getElementById('pMyRank').textContent = rank ? `${rank}${rank === 1 ? 'er' : 'e'} / ${scores.length}` : '';
+      renderScoreRows('pScoreRows', scores);
+    }
+
+    function renderFinalScores(scores, badges) {
+      const me = scores.find(s => s.id === myId);
+      document.getElementById('pFinalScore').textContent = me ? me.score : 0;
+      const rank = scores.findIndex(s => s.id === myId) + 1;
+      document.getElementById('pFinalRank').textContent = rank ? `${rank}${rank === 1 ? 'er' : 'e'} / ${scores.length}` : '';
+      renderScoreRows('pFinalScoreRows', scores);
+
+      const bEl = document.getElementById('pBadges');
+      const items = [];
+      if (badges.bestGuesser) items.push({ icon: '\uD83C\uDFAF', title: 'Meilleur devineur', name: badges.bestGuesser.name, avatar: badges.bestGuesser.avatar });
+      if (badges.biggestMystery) items.push({ icon: '\uD83D\uDD75\uFE0F', title: 'Grand mystere', name: badges.biggestMystery.name, avatar: badges.biggestMystery.avatar });
+      if (badges.biggestSurprise) items.push({ icon: '\uD83C\uDF89', title: 'Surprise du soir', name: badges.biggestSurprise.name, avatar: badges.biggestSurprise.avatar });
+      bEl.innerHTML = items.map(b => `
+        <div class="badge">
+          <span class="badge-icon">${b.icon}</span>
+          <span class="badge-title">${b.title}</span>
+          ${avatarSVG(b.avatar, 40)}
+          <span class="badge-name">${b.name}</span>
+        </div>
+      `).join('');
+    }
+
+    function renderScoreRows(id, scores) {
+      document.getElementById(id).innerHTML = scores.map((s, i) => `
+        <div class="score-row" ${s.id === myId ? 'style="background:var(--coral-light);border-radius:8px"' : ''}>
+          <span class="score-rank">${i + 1}</span>
+          ${avatarSVG(s.avatar, 36)}
+          <span class="score-name">${escapeHtml(s.name)}</span>
+          <span class="score-pts">${s.score} pts</span>
+        </div>
+      `).join('');
+    }
+
+    // ── Podium (online mode) ─────────────────────────────────────────
+    function renderPodium(id, scores) {
+      const el = document.getElementById(id);
+      if (!el || scores.length < 3) { if (el) el.innerHTML = ''; return; }
+      const order = [scores[1], scores[0], scores[2]];
+      const classes = ['second', 'first', 'third'];
+      el.innerHTML = order.map((s, i) => `
+        <div class="podium-place">
+          ${avatarSVG(s.avatar, 48)}
+          <span class="podium-name">${escapeHtml(s.name)}</span>
+          <div class="podium-bar ${classes[i]}">${s.score}</div>
+        </div>
+      `).join('');
+    }
+
+    // ── Sounds (Web Audio API) ───────────────────────────────────────
+    let audioCtx;
+    function getAudioCtx() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return audioCtx;
+    }
+
+    function playDrumroll() {
+      if (isMuted) return;
+      try {
+        const ctx = getAudioCtx();
+        const duration = 2.5;
+        const steps = 20;
+        for (let i = 0; i < steps; i++) {
+          const t = ctx.currentTime + (i / steps) * duration;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.value = 200 + Math.random() * 100;
+          gain.gain.setValueAtTime(0.08, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.08);
+        }
+      } catch(e) {}
+    }
+
+    function playRevealSound() {
+      if (isMuted) return;
+      try {
+        const ctx = getAudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(400, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.4);
+      } catch(e) {}
+    }
+
+  </script>
+</body>
+</html>

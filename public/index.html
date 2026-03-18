@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Podium</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="full-center">
+    <div style="width:100%;max-width:400px">
+      <div class="logo" style="font-size:2.5rem;margin-bottom:0.25rem">Podium</div>
+      <p class="tagline mb-2">Qui se cache derri&egrave;re ce TOP 3 ?</p>
+
+      <div class="divider"></div>
+
+      <!-- Main menu -->
+      <div id="menu">
+        <button class="btn btn-primary btn-large btn-full" onclick="showModeChoice()">
+          Cr&eacute;er une salle
+        </button>
+        <div class="spacer"></div>
+        <button class="btn btn-secondary btn-large btn-full" onclick="showJoin()">
+          Rejoindre une salle
+        </button>
+      </div>
+
+      <!-- Mode choice -->
+      <div id="modeChoice" class="hidden" style="animation:fade-up .3s ease">
+        <p style="font-weight:600;font-size:1.1rem;margin-bottom:1rem">Comment voulez-vous jouer ?</p>
+        <button class="btn btn-primary btn-large btn-full" onclick="createRoom('presentiel')">
+          En pr&eacute;sentiel
+        </button>
+        <p class="text-muted mt-1" style="font-size:0.85rem">Un &eacute;cran partag&eacute; (TV/laptop) + t&eacute;l&eacute;phones</p>
+        <div class="spacer"></div>
+        <button class="btn btn-teal btn-large btn-full" onclick="createRoom('online')">
+          En ligne
+        </button>
+        <p class="text-muted mt-1" style="font-size:0.85rem">Chacun sur son t&eacute;l&eacute;phone, un joueur contr&ocirc;le</p>
+        <div class="spacer-sm"></div>
+        <button class="btn btn-secondary btn-full" onclick="backToMenu()">Retour</button>
+      </div>
+
+      <!-- Join form -->
+      <div id="joinForm" class="hidden" style="animation:fade-up .3s ease">
+        <div class="input-group mb-2">
+          <label>Code de la salle</label>
+          <input id="codeInput" class="input" type="text" maxlength="4"
+            placeholder="ABCD" autocomplete="off" style="text-transform:uppercase;text-align:center;font-size:1.5rem;letter-spacing:0.2em;font-weight:700">
+        </div>
+        <button class="btn btn-primary btn-large btn-full" onclick="goJoin()">
+          Rejoindre
+        </button>
+        <div class="spacer-sm"></div>
+        <button class="btn btn-secondary btn-full" onclick="backToMenu()">Retour</button>
+        <p id="joinError" class="text-coral mt-1 text-center hidden"></p>
+      </div>
+
+      <!-- Creating... -->
+      <div id="creating" class="hidden center">
+        <p class="text-muted">Cr&eacute;ation en cours...</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const joinCode = params.get('join');
+
+    if (joinCode) {
+      document.getElementById('menu').classList.add('hidden');
+      document.getElementById('joinForm').classList.remove('hidden');
+      document.getElementById('codeInput').value = joinCode.toUpperCase().substring(0, 4);
+    }
+
+    function showModeChoice() {
+      document.getElementById('menu').classList.add('hidden');
+      document.getElementById('modeChoice').classList.remove('hidden');
+    }
+
+    function createRoom(mode) {
+      document.getElementById('modeChoice').classList.add('hidden');
+      document.getElementById('creating').classList.remove('hidden');
+
+      fetch('/api/create-room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (mode === 'online') {
+            location.href = '/player.html?code=' + data.code + '&host=1';
+          } else {
+            location.href = '/host.html?code=' + data.code;
+          }
+        })
+        .catch(() => {
+          document.getElementById('creating').classList.add('hidden');
+          document.getElementById('menu').classList.remove('hidden');
+          alert('Erreur lors de la création');
+        });
+    }
+
+    function showJoin() {
+      document.getElementById('menu').classList.add('hidden');
+      document.getElementById('joinForm').classList.remove('hidden');
+      document.getElementById('codeInput').focus();
+    }
+
+    function backToMenu() {
+      document.getElementById('joinForm').classList.add('hidden');
+      document.getElementById('modeChoice').classList.add('hidden');
+      document.getElementById('menu').classList.remove('hidden');
+    }
+
+    async function goJoin() {
+      const code = document.getElementById('codeInput').value.trim().toUpperCase();
+      if (code.length !== 4) {
+        showError('Code à 4 lettres requis');
+        return;
+      }
+
+      const res = await fetch('/api/room/' + code).then(r => r.json());
+      if (!res.exists) {
+        showError('Salle introuvable');
+        return;
+      }
+      if (res.state !== 'lobby') {
+        showError('Partie déjà en cours');
+        return;
+      }
+
+      location.href = '/player.html?code=' + code;
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('joinError');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      el.style.animation = 'shake 0.3s';
+      setTimeout(() => el.style.animation = '', 300);
+    }
+
+    // Enter key on code input
+    document.getElementById('codeInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') goJoin();
+    });
+  </script>
+</body>
+</html>
