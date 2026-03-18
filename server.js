@@ -36,39 +36,101 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-// ── Themes ──────────────────────────────────────────────────────────────────
-const THEMES = [
-  "Tes 3 séries que tu ne te lasseras jamais de revoir",
-  "Tes 3 films qui t'ont marqué pour toujours",
-  "Tes 3 personnages de série que tu voudrais avoir comme ami",
-  "Tes 3 méchants de films que tu adores secrètement",
-  "Tes 3 scènes de film qui te font pleurer à chaque fois",
-  "Tes 3 plats que tu commanderais pour ton dernier repas",
-  "Tes 3 repas de honte totalement assumés",
-  "Tes 3 snacks interdits mais irrésistibles",
-  "Tes 3 plats que tu rates à chaque fois mais que tu retentes quand même",
-  "Tes 3 restaurants ou fast-foods où tu pourrais manger tous les jours",
-  "Tes 3 destinations si tu avais un billet open-jaw demain",
-  "Tes 3 villes où tu pourrais t'installer pour toujours",
-  "Tes 3 souvenirs de voyage les plus marquants",
-  "Tes 3 pays que tu n'irais jamais visiter",
-  "Tes 3 souvenirs de vacances d'enfance",
-  "Tes 3 trucs que tu faisais en cachette de tes parents",
-  "Tes 3 dessins animés ou émissions que tu regardais en boucle",
-  "Tes 3 jeux auxquels tu jouais dans la cour de récré",
-  "Les 3 trucs que tu fais quand tu es vraiment seul chez toi",
-  "Tes 3 talents cachés (vrais ou imaginaires)",
-  "Les 3 trucs qui t'énervent instantanément",
-  "Tes 3 red flags en amitié ou en couple",
-  "Tes 3 chansons que tu écoutes en boucle quand tu es triste",
-  "Les 3 applications que tu ouvres en premier le matin",
-  "Tes 3 petits plaisirs coupables du quotidien",
-  "3 personnes (vivantes ou mortes) que tu inviterais à dîner",
-  "3 super-pouvoirs que tu choisirais",
-  "3 métiers que tu aurais aimé faire dans une autre vie",
-  "Les 3 trucs que tu ferais si tu étais invisible pendant 24h",
-  "Tes 3 objets indispensables sur une île déserte",
+// ── Themes (50 questions, 9 catégories) ─────────────────────────────────────
+const THEME_CATEGORIES = [
+  // Culture pop
+  [
+    "Tes 3 séries que tu ne te lasseras jamais de revoir",
+    "Tes 3 films qui t'ont marqué pour toujours",
+    "Tes 3 personnages de série que tu voudrais avoir comme ami",
+    "Tes 3 méchants de films que tu adores secrètement",
+    "Tes 3 jeux vidéo préférés de tous les temps",
+    "Tes 3 personnages fictifs pour qui tu as eu un crush",
+  ],
+  // Nourriture & cuisine
+  [
+    "Tes 3 plats que tu commanderais pour ton dernier repas",
+    "Tes 3 repas de honte totalement assumés",
+    "Tes 3 trucs que tu manges d'une façon que personne ne comprend",
+    "Tes 3 combos alimentaires bizarres que tu adores",
+    "Tes 3 plus gros fails en cuisine",
+  ],
+  // Musique & sons
+  [
+    "Tes 3 chansons que tu écoutes en boucle quand tu es triste",
+    "Tes 3 chansons que tu chantes à fond seul en voiture",
+    "Tes 3 artistes ou groupes que tu as honte d'écouter",
+    "Les 3 sons ou bruits que tu ne supportes absolument pas",
+  ],
+  // Nostalgie & enfance
+  [
+    "Tes 3 dessins animés ou émissions que tu regardais en boucle",
+    "Tes 3 jeux auxquels tu jouais dans la cour de récré",
+    "Tes 3 trucs que tu faisais enfant et que tu fais encore aujourd'hui",
+  ],
+  // Habitudes & quotidien
+  [
+    "Les 3 trucs que tu fais quand tu es vraiment seul chez toi",
+    "Les 3 applications que tu ouvres en premier le matin",
+    "Tes 3 petits plaisirs coupables du quotidien",
+    "Tes 3 pires habitudes que tu assumes complètement",
+    "Tes 3 mots ou expressions que tu dis tout le temps",
+    "Les 3 trucs qui te rendent instantanément de bonne humeur",
+    "Les 3 trucs que tu fais en réunion/cours quand tu t'ennuies",
+  ],
+  // Aveux & faiblesses
+  [
+    "Tes 3 talents cachés (vrais ou imaginaires)",
+    "Les 3 trucs qui t'énervent instantanément",
+    "Tes 3 plus gros mensonges que tu répètes régulièrement",
+    "Tes 3 phobies ou trucs irrationnels qui te font flipper",
+    "Tes 3 excuses préférées pour annuler un plan",
+    "Tes 3 trucs que tu fais semblant de comprendre",
+    "Tes 3 compétences les plus inutiles",
+    "Les 3 trucs que tu ne sais toujours pas faire à ton âge",
+  ],
+  // Imaginaire & rêves
+  [
+    "3 métiers que tu aurais aimé faire dans une autre vie",
+    "Tes 3 objets indispensables sur une île déserte",
+    "Les 3 lois que tu instaurerais si tu étais président",
+    "Les 3 trucs que tu ferais avec 10 millions d'euros",
+    "Les 3 époques où tu aurais aimé vivre",
+    "Les 3 trucs que tu voudrais apprendre si tu avais tout le temps du monde",
+  ],
+  // Social & relations
+  [
+    "Tes 3 trucs qui te dégoûtent instantanément chez quelqu'un",
+    "Les 3 trucs que tu remarques en premier chez quelqu'un",
+    "Les 3 trucs que tu fais qui énervent ton entourage",
+    "Tes 3 compliments qu'on te fait le plus souvent",
+    "Tes 3 célébrités avec qui tu aimerais être ami",
+  ],
+  // Goûts & attachements
+  [
+    "Tes 3 sports ou activités que tu détestes",
+    "Tes 3 destinations si tu pouvais partir demain",
+    "Tes 3 endroits où tu te sens le mieux au monde",
+    "Tes 3 plus grosses dépenses inutiles",
+    "Tes 3 objets auxquels tu tiens le plus",
+    "Tes 3 trucs que tu achètes toujours en trop grande quantité",
+  ],
 ];
+
+// Sélectionne N thèmes en piochant max 1 par catégorie
+function pickThemes(count) {
+  const cats = shuffleArray(THEME_CATEGORIES.map(cat => shuffleArray([...cat])));
+  const picked = [];
+  let round = 0;
+  while (picked.length < count) {
+    for (const cat of cats) {
+      if (picked.length >= count) break;
+      if (round < cat.length) picked.push(cat[round]);
+    }
+    round++;
+  }
+  return shuffleArray(picked);
+}
 
 // ── State ───────────────────────────────────────────────────────────────────
 const rooms = new Map();
@@ -473,7 +535,7 @@ function handleMessage(ws, type, payload) {
 // ── Game Logic ──────────────────────────────────────────────────────────────
 
 function startGame(room) {
-  room.themes = shuffleArray(THEMES).slice(0, room.rounds);
+  room.themes = pickThemes(room.rounds);
   room.currentRound = 0;
   for (const p of room.players.values()) p.score = 0;
   startRound(room);
