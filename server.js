@@ -117,17 +117,21 @@ const THEME_CATEGORIES = [
   ],
 ];
 
-// Sélectionne N thèmes en piochant max 1 par catégorie
+// Sélectionne N thèmes avec max 50% d'une même catégorie
 function pickThemes(count) {
-  const cats = shuffleArray(THEME_CATEGORIES.map(cat => shuffleArray([...cat])));
+  const maxPerCat = Math.max(1, Math.floor(count / 2));
+  const all = shuffleArray(
+    THEME_CATEGORIES.flatMap((cat, i) => cat.map(q => ({ q, cat: i })))
+  );
+  const catCount = {};
   const picked = [];
-  let round = 0;
-  while (picked.length < count) {
-    for (const cat of cats) {
-      if (picked.length >= count) break;
-      if (round < cat.length) picked.push(cat[round]);
+  for (const item of all) {
+    if (picked.length >= count) break;
+    const c = catCount[item.cat] || 0;
+    if (c < maxPerCat) {
+      picked.push(item.q);
+      catCount[item.cat] = c + 1;
     }
-    round++;
   }
   return shuffleArray(picked);
 }
