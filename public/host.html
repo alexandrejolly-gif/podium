@@ -72,6 +72,7 @@
       <p class="text-muted mt-1">Regardez vos telephones</p>
       <div class="spacer"></div>
       <p class="top-counter" id="guessCounter">Top 1 / ?</p>
+      <p class="text-muted text-center" id="guessTheme" style="font-size:0.9rem;margin-bottom:0.75rem;font-style:italic"></p>
       <ul class="top-items" id="guessItems" aria-label="Top anonyme"></ul>
       <div class="timer-bar-wrap">
         <div class="timer-bar" id="guessTimerBar" style="width:100%" role="progressbar"></div>
@@ -160,6 +161,7 @@
     let fillTimeTotal = 60;
     let guessTimeTotal = 30;
     let currentRevealData = null;
+    let currentThemeName = '';
     let isMuted = false;
     let previousPlayerCount = 0;
 
@@ -211,6 +213,7 @@
           showPhase('filling');
           document.getElementById('fillRound').textContent = p.round;
           document.getElementById('fillTotal').textContent = p.totalRounds;
+          currentThemeName = p.theme || '';
           document.getElementById('fillTheme').textContent = p.theme;
           renderFillPlayers();
           fillTimeTotal = p.timeLeft || 60;
@@ -232,6 +235,7 @@
           document.getElementById('guessRound').textContent = p.round || '';
           document.getElementById('guessRoundTotal').textContent = p.totalRounds || '';
           document.getElementById('guessCounter').textContent = `Top ${p.topIndex + 1} / ${p.totalTops}`;
+          document.getElementById('guessTheme').textContent = currentThemeName;
           renderTopItems('guessItems', p.items);
           guessTimeTotal = p.timeLeft || 30;
           updateGuessTimer(guessTimeTotal);

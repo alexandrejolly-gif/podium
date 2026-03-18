@@ -154,6 +154,7 @@
         <!-- Amelioration 3 : round info pendant guessing -->
         <p class="host-phase-label text-center">Round <span id="pGuessRound">1</span>/<span id="pGuessRoundTotal">5</span></p>
         <p class="top-counter text-center" id="pGuessCounter">Top 1 / ?</p>
+        <p class="text-muted text-center" id="pGuessTheme" style="font-size:0.85rem;margin-bottom:0.75rem;font-style:italic"></p>
         <ul class="top-items" id="pGuessItems" aria-label="Top anonyme"></ul>
         <div class="timer-bar-wrap">
           <div class="timer-bar" id="pGuessTimerBar" style="width:100%" role="progressbar"></div>
@@ -287,6 +288,7 @@
     let selectedAvatar = 0;
     let players = [];
     let currentTopIndex = null;
+    let currentThemeName = '';
     let selectedGuessId = null;
     let guessedTops = new Set();
     let fillTimeTotal = 60;
@@ -412,6 +414,7 @@
             renderLobby();
           } else if (p.state === 'filling') {
             showPhase('filling');
+            currentThemeName = p.theme || '';
             document.getElementById('pFillTheme').textContent = p.theme;
             document.getElementById('pFillRound').textContent = p.round;
             document.getElementById('pFillTotal').textContent = p.totalRounds;
@@ -451,6 +454,7 @@
 
         case 'game_started':
           showPhase('filling');
+          currentThemeName = p.theme || '';
           document.getElementById('pFillRound').textContent = p.round;
           document.getElementById('pFillTotal').textContent = p.totalRounds;
           document.getElementById('pFillTheme').textContent = p.theme;
@@ -501,6 +505,7 @@
             document.getElementById('pGuessRound').textContent = p.round || '';
             document.getElementById('pGuessRoundTotal').textContent = p.totalRounds || '';
             document.getElementById('pGuessCounter').textContent = `Top ${p.topIndex + 1} / ${p.totalTops}`;
+            document.getElementById('pGuessTheme').textContent = currentThemeName;
             renderTopItems('pGuessItems', p.items);
             renderGuessGrid(p.players || []);
             document.getElementById('confirmGuessBtn').disabled = true;
