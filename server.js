@@ -61,6 +61,7 @@ const THEME_CATEGORIES = [
     "Tes 3 chansons que tu chantes à fond seul en voiture",
     "Tes 3 artistes ou groupes que tu as honte d'écouter",
     "Les 3 sons ou bruits que tu ne supportes absolument pas",
+    "Tes 3 chansons préférées de tous les temps",
   ],
   // Nostalgie & enfance
   [
@@ -105,6 +106,8 @@ const THEME_CATEGORIES = [
     "Les 3 trucs que tu fais qui énervent ton entourage",
     "Tes 3 compliments qu'on te fait le plus souvent",
     "Tes 3 célébrités avec qui tu aimerais être ami",
+    "Tes 3 acteurs que tu trouves les plus beaux",
+    "Tes 3 actrices que tu trouves les plus belles",
   ],
   // Goûts & attachements
   [
@@ -114,6 +117,8 @@ const THEME_CATEGORIES = [
     "Tes 3 plus grosses dépenses inutiles",
     "Tes 3 objets auxquels tu tiens le plus",
     "Tes 3 trucs que tu achètes toujours en trop grande quantité",
+    "Tes 3 voitures de rêve",
+    "Tes 3 saisons préférées",
   ],
 ];
 
