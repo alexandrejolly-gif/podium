@@ -161,8 +161,8 @@ function generateId() {
 
 function sanitize(str, maxLen) {
   if (typeof str !== 'string') return '';
-  return str.replace(/[<>&"']/g, c => ({
-    '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;'
+  return str.replace(/[<>&]/g, c => ({
+    '<': '&lt;', '>': '&gt;', '&': '&amp;',
   })[c]).substring(0, maxLen);
 }
 
